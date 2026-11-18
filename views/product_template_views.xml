@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Product Template Form View - Add FBR Page -->
+    <record id="view_product_template_form_fbr" model="ir.ui.view">
+        <field name="name">product.template.form.fbr</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view" />
+        <field name="arch" type="xml">
+
+            <!-- Add FBR Page after Sales tab -->
+            <xpath expr="//page[@name='sales']" position="after">
+                <page string="FBR Information" name="fbr_information">
+
+                    <!-- FBR Classification Section -->
+                    <group string="FBR Classification &amp; Identification" name="fbr_classification">
+                        <group>
+                            <field name="fbr_hs_code" placeholder="e.g., 1901.1000"/>
+                            <field name="fbr_uom_id"/>
+                        </group>
+                        <group>
+                            <field name="fbr_sro_id" options="{'no_open': True}"/>
+                            <field name="fbr_sro_name" invisible="1"/>
+                            <field name="fbr_sro_item_serial_id"/>
+                        </group>
+                    </group>
+
+                    <!-- FBR Tax Configuration & 3rd Schedule Retail Price Breakdown -->
+                    <group string="FBR Tax Configuration &amp; 3rd Schedule Retail Pricing" name="fbr_tax_config">
+                        <group string="3rd Schedule Retail Price Breakdown (Unit)">
+                            <field name="fbr_retail_price_inc"/>
+                            <field name="fbr_retail_price_excl"/>
+                            <field name="fbr_retail_unit_tax"/>
+                        </group>
+                        <group string="Additional FBR Configuration">
+                            <field name="fbr_fed_payable_id"/>
+                            <field name="fbr_fixed_notified_value" invisible="fbr_sro_name != '3rd Schedule goods'"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

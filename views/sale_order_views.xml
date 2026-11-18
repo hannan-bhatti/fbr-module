@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sale Order Form View - Add FBR 3rd Schedule Retail fields to order lines -->
+    <record id="view_order_form_fbr_lines" model="ir.ui.view">
+        <field name="name">sale.order.form.fbr.lines</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="before">
+                <field name="fbr_retail_price_inc" string="Retail MRP (Inc. ST)" optional="show"/>
+                <field name="fbr_retail_unit_tax" string="Unit ST (18%)" optional="show"/>
+                <field name="fbr_retail_price_excl" string="Retail Excl. ST" optional="show"/>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_subtotal']" position="after">
+                <field name="fbr_line_sales_tax" string="Sales Tax (18%)" optional="show"/>
+                <field name="fbr_line_extra_tax" string="Extra Tax (4%)" optional="hide"/>
+                <field name="fbr_line_value_inc_st" string="Value Inc. of ST" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
