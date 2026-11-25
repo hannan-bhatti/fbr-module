@@ -9,6 +9,8 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='category_id']" position="after">
                 <field name="fbr_buyer_type_id"/>
+                <field name="fbr_wht_236g_type"/>
+                <field name="fbr_apply_extra_tax"/>
             </xpath>
         </field>
     </record>

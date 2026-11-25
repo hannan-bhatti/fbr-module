@@ -2,7 +2,7 @@
 
 from odoo import models, fields, api
 from odoo.tools import float_round
-from .product_template import _parse_float_str
+from .product_template import _parse_float_str, _is_fbr_3rd_schedule
 
 
 class AccountTax(models.Model):
@@ -49,6 +49,58 @@ class AccountTax(models.Model):
             return self._get_base_line_field_value_from_record(record, field, kwargs, fallback)
 
         product = base_line.get('product_id') or self.env['product.product']
+        taxes = base_line.get('tax_ids')
+        is_invoice_line = bool(record and getattr(record, '_name', None) == 'account.move.line')
+
+        if is_invoice_line:
+            move = record.move_id
+            is_3rd_schedule = bool(
+                record._is_fbr_3rd_schedule_line()
+                or (move and move._is_fbr_3rd_schedule_move())
+            )
+            if not is_3rd_schedule:
+                base_line.update({
+                    'fbr_retail_price_inc': 0.0,
+                    'fbr_retail_price_excl': 0.0,
+                    'fbr_retail_unit_tax': 0.0,
+                    'fbr_is_3rd_schedule': False,
+                })
+                return base_line
+            inc, excl, unit_tax, _ = move._resolve_line_3rd_schedule_retail(record) if move else (
+                record.fbr_retail_price_inc or 0.0,
+                record.fbr_retail_price_excl or 0.0,
+                record.fbr_retail_unit_tax or 0.0,
+                record.fbr_fixed_notified_value or '0',
+            )
+            retail_inc = kwargs.get('fbr_retail_price_inc') or inc
+            retail_excl = kwargs.get('fbr_retail_price_excl') or excl
+            retail_unit_tax = kwargs.get('fbr_retail_unit_tax') or unit_tax
+            if retail_inc > 0.0 and retail_unit_tax > 0.0 and not retail_excl and retail_unit_tax < retail_inc:
+                retail_excl = round(retail_inc - retail_unit_tax, 2)
+            elif retail_inc > 0.0 and not retail_excl and not retail_unit_tax:
+                retail_excl = round(retail_inc / 1.18, 2)
+                retail_unit_tax = round(retail_inc - retail_excl, 2)
+            base_line.update({
+                'fbr_retail_price_inc': retail_inc,
+                'fbr_retail_price_excl': retail_excl,
+                'fbr_retail_unit_tax': retail_unit_tax,
+                'fbr_is_3rd_schedule': True,
+            })
+            return base_line
+
+        line_sro = getattr(record, 'fbr_sro_id', None) if record else None
+        sro_name = (
+            line_sro.name
+            if line_sro
+            else (product.fbr_sro_name if product else '')
+        )
+
+        is_explicit_3rd = _is_fbr_3rd_schedule(
+            sro_name=sro_name,
+            tax_ids=taxes,
+            include_retail=False,
+        )
+
         retail_inc = load('fbr_retail_price_inc', 0.0)
         retail_excl = load('fbr_retail_price_excl', 0.0)
         retail_unit_tax = load('fbr_retail_unit_tax', 0.0)
@@ -62,8 +114,8 @@ class AccountTax(models.Model):
             if not fixed_notified:
                 fixed_notified = product.fbr_fixed_notified_value or ''
 
-        # Fallback to legacy fbr_fixed_notified_value string (e.g., '830') if float fields are still 0
-        if not retail_inc and not retail_excl and not retail_unit_tax and fixed_notified:
+        # Fallback to legacy fbr_fixed_notified_value string ONLY for explicit 3rd Schedule items
+        if is_explicit_3rd and not retail_inc and not retail_excl and not retail_unit_tax and fixed_notified:
             parsed_inc = round(_parse_float_str(fixed_notified), 2)
             if parsed_inc > 0.0:
                 retail_inc = parsed_inc
@@ -80,11 +132,17 @@ class AccountTax(models.Model):
                 retail_unit_tax = round(retail_excl * 0.18, 2)
                 retail_inc = round(retail_excl + retail_unit_tax, 2)
 
-        is_3rd_schedule = bool(
-            retail_unit_tax > 0.0
-            or retail_excl > 0.0
-            or (product and product.fbr_sro_name == '3rd Schedule goods')
+        is_3rd_schedule = _is_fbr_3rd_schedule(
+            sro_name=sro_name,
+            tax_ids=taxes,
+            retail_unit_tax=retail_unit_tax,
+            retail_excl=retail_excl,
         )
+
+        if not is_3rd_schedule:
+            retail_inc = 0.0
+            retail_excl = 0.0
+            retail_unit_tax = 0.0
 
         base_line.update({
             'fbr_retail_price_inc': retail_inc,
@@ -133,7 +191,11 @@ class AccountTax(models.Model):
             tax = tax_data.get('tax')
             if tax and (
                 tax.fbr_tax_type == 'wht_236g'
-                or (tax.amount_type == 'percent' and 0.0 < abs(tax.amount) < 1.0)
+                or (
+                    tax.amount_type == 'percent'
+                    and 0.0 < abs(tax.amount) < 1.0
+                    and 'reduced' not in (tax.name or '').lower()
+                )
             ):
                 unrounded_currency = tax_data['raw_base_amount_currency'] * (tax.amount / 100.0)
                 tax_data['raw_tax_amount_currency'] = unrounded_currency
@@ -158,21 +220,22 @@ class AccountTax(models.Model):
         self.ensure_one()
         if self.amount_type == 'percent':
             product_ctx = evaluation_context.get('product') or {}
-            retail_unit_tax = (
-                self.env.context.get('fbr_base_line_retail_unit_tax')
-                or product_ctx.get('fbr_retail_unit_tax')
-                or 0.0
-            )
-            retail_price_excl = (
-                self.env.context.get('fbr_base_line_retail_price_excl')
-                or product_ctx.get('fbr_retail_price_excl')
-                or 0.0
-            )
-            is_3rd_schedule = bool(
-                self.env.context.get('fbr_base_line_is_3rd_schedule')
-                or retail_unit_tax > 0.0
-                or retail_price_excl > 0.0
-            )
+            if 'fbr_base_line_is_3rd_schedule' in self.env.context:
+                is_3rd_schedule = bool(self.env.context.get('fbr_base_line_is_3rd_schedule'))
+                retail_unit_tax = (
+                    (self.env.context.get('fbr_base_line_retail_unit_tax') or 0.0)
+                    if is_3rd_schedule
+                    else 0.0
+                )
+                retail_price_excl = (
+                    (self.env.context.get('fbr_base_line_retail_price_excl') or 0.0)
+                    if is_3rd_schedule
+                    else 0.0
+                )
+            else:
+                retail_unit_tax = product_ctx.get('fbr_retail_unit_tax') or 0.0
+                retail_price_excl = product_ctx.get('fbr_retail_price_excl') or 0.0
+                is_3rd_schedule = bool(retail_unit_tax > 0.0 or retail_price_excl > 0.0)
             quantity = evaluation_context.get('quantity', 0.0)
             sign = -1.0 if evaluation_context.get('price_unit', 0.0) < 0.0 else 1.0
 

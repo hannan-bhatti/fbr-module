@@ -7,6 +7,10 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='payment_term_id']" position="after">
+                <field name="fbr_wht_236g_type"/>
+                <field name="fbr_apply_extra_tax"/>
+            </xpath>
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="before">
                 <field name="fbr_retail_price_inc" string="Retail MRP (Inc. ST)" optional="show"/>
                 <field name="fbr_retail_unit_tax" string="Unit ST (18%)" optional="show"/>

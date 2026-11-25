@@ -14,7 +14,7 @@
                 <field name="fbr_uom_id" optional="hide"/>
                 <field name="fbr_sro_id" optional="hide"/>
                 <field name="fbr_sro_item_serial_id" optional="hide"/>
-                <field name="fbr_fixed_notified_value" optional="hide"/>
+                <field name="fbr_fixed_notified_value" optional="show"/>
                 <field name="fbr_retail_price_inc" string="Retail MRP (Inc. ST)" optional="show"/>
                 <field name="fbr_retail_unit_tax" string="Unit ST (18%)" optional="show"/>
                 <field name="fbr_retail_price_excl" string="Retail Excl. ST" optional="show"/>
@@ -29,6 +29,16 @@
                 <field name="fbr_line_sales_tax" string="Sales Tax (18%)" optional="show"/>
                 <field name="fbr_line_extra_tax" string="Extra Tax (4%)" optional="hide"/>
                 <field name="fbr_line_value_inc_st" string="Value Inc. of ST" optional="show"/>
+            </xpath>
+
+            <!-- Keep FBR retail fields synchronized in line_ids view state for live onchange tax_totals -->
+            <xpath expr="//field[@name='line_ids']/list/field[@name='balance']"
+                position="after">
+                <field name="fbr_sro_id" column_invisible="True"/>
+                <field name="fbr_fixed_notified_value" column_invisible="True"/>
+                <field name="fbr_retail_price_inc" column_invisible="True"/>
+                <field name="fbr_retail_unit_tax" column_invisible="True"/>
+                <field name="fbr_retail_price_excl" column_invisible="True"/>
             </xpath>
         </field>
     </record>

@@ -19,6 +19,8 @@
                 <field name="fbr_buyer_type_id" invisible="not fbr_buyer_type_id"
                     options="{ 'no_open': True}"
                 />
+                <field name="fbr_wht_236g_type" invisible="move_type not in ('out_invoice', 'out_refund')" />
+                <field name="fbr_apply_extra_tax" invisible="move_type not in ('out_invoice', 'out_refund')" />
             </xpath>
 
             <!-- Add FBR tab -->

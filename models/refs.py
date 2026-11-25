@@ -70,7 +70,7 @@ class FbrScenarios(models.Model):
     _name = 'fbr.scenarios'
     _description = 'FBR Scenarios'
     _rec_name = 'name'
-    _order = 'name'
+    _order = 'code, name'
     _name_uniq = models.Constraint('unique(name)', 'FBR Scenarios must be unique!')
 
     name = fields.Char(string='Scenario Name')
